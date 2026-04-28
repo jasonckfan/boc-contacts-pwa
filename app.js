@@ -48,8 +48,12 @@ class ContactManager {
         try {
             const stored = await this.getAllContactsFromDB();
             
-            // Check if we need to update data (compare counts)
-            if (stored.length === 0 || stored.length !== contactsData.length) {
+            // If seed data is empty, clear all stored data
+            if (contactsData.length === 0) {
+                await this.clearAllContacts();
+                this.contacts = [];
+                console.log('數據已清空 - 等待重新導入');
+            } else if (stored.length === 0 || stored.length !== contactsData.length) {
                 // Clear existing data and seed new data
                 await this.clearAllContacts();
                 await this.seedContacts();

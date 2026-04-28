@@ -1,4 +1,4 @@
-const CACHE_NAME = 'contacts-pwa-v2';  // Updated version to force cache refresh
+const CACHE_NAME = 'contacts-pwa-v3-clear-data';  // Updated version to force cache refresh - DATA CLEARED
 const STATIC_ASSETS = [
     '/',
     '/index.html',
