@@ -48,10 +48,13 @@ class ContactManager {
         try {
             const stored = await this.getAllContactsFromDB();
             
-            if (stored.length === 0) {
-                // Seed initial data
+            // Check if we need to update data (compare counts)
+            if (stored.length === 0 || stored.length !== contactsData.length) {
+                // Clear existing data and seed new data
+                await this.clearAllContacts();
                 await this.seedContacts();
                 this.contacts = [...contactsData];
+                console.log(`已加載 ${contactsData.length} 個聯繫人`);
             } else {
                 this.contacts = stored;
             }
@@ -63,6 +66,18 @@ class ContactManager {
             console.error('Error loading contacts:', error);
             this.showToast('加載數據失敗，請刷新頁面重試');
         }
+    }
+    
+    // Clear all contacts from IndexedDB
+    async clearAllContacts() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['contacts'], 'readwrite');
+            const store = transaction.objectStore('contacts');
+            const request = store.clear();
+            
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
     }
     
     // Seed contacts to IndexedDB
