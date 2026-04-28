@@ -1,0 +1,25 @@
+{
+  "name": "contacts-pwa",
+  "version": "1.0.0",
+  "description": "聯繫人管理 PWA Web App - BOC IT Department",
+  "main": "index.html",
+  "scripts": {
+    "start": "http-server -p 8080 -c-1",
+    "dev": "http-server -p 8080 -c-1 -o",
+    "build": "echo 'Static site - no build needed'",
+    "test": "echo 'Tests not implemented'"
+  },
+  "keywords": [
+    "pwa",
+    "contacts",
+    "management",
+    "boc",
+    "it",
+    "hong-kong"
+  ],
+  "author": "BOC IT",
+  "license": "MIT",
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

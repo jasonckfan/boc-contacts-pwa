@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1e3a8a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="description" content="聯繫人管理系統 - 中銀香港 IT 部門">
+    <title>聯繫人管理 - BOC IT</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192x192.png">
+    <link rel="apple-touch-icon" sizes="192x192" href="icons/icon-192x192.png">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1e3a8a',
+                        secondary: '#3b82f6',
+                        accent: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        
+        /* Smooth transitions */
+        .contact-card {
+            transition: all 0.3s ease;
+        }
+        .contact-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        /* Search input focus */
+        .search-input:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+        }
+        
+        /* Department badge animation */
+        .dept-badge {
+            transition: all 0.2s ease;
+        }
+        .dept-badge:hover {
+            transform: scale(1.05);
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 640px) {
+            .mobile-full {
+                width: 100vw;
+                margin-left: calc(-50vw + 50%);
+            }
+        }
+        
+        /* Offline indicator */
+        .offline-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ef4444;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            z-index: 9999;
+            transform: translateY(-100%);
+            transition: transform 0.3s ease;
+        }
+        .offline-indicator.show {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Offline Indicator -->
+    <div id="offlineIndicator" class="offline-indicator">
+        <i class="fas fa-wifi-slash mr-2"></i>離線模式 - 數據可能不是最新的
+    </div>
+    
+    <!-- Header -->
+    <header class="bg-primary text-white shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-white rounded-full flex items-center justify-center">
+                        <i class="fas fa-address-book text-primary text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold">聯繫人管理</h1>
+                        <p class="text-xs text-blue-200">BOC IT Department</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="refreshBtn" class="p-2 rounded-full hover:bg-blue-800 transition" title="刷新數據">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                    <button id="installBtn" class="hidden p-2 rounded-full hover:bg-blue-800 transition" title="安裝應用">
+                        <i class="fas fa-download"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Search Section -->
+    <section class="bg-white shadow-sm sticky top-[72px] z-40">
+        <div class="container mx-auto px-4 py-4">
+            <div class="relative">
+                <input 
+                    type="text" 
+                    id="searchInput" 
+                    placeholder="搜索姓名、部門、職位..." 
+                    class="search-input w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:border-secondary focus:outline-none text-base"
+                >
+                <i class="fas fa-search absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-lg"></i>
+                <button id="clearSearch" class="hidden absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <i class="fas fa-times-circle text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Quick Stats -->
+            <div class="flex justify-between mt-3 text-sm text-gray-600">
+                <span id="totalContacts">總聯繫人: 0</span>
+                <span id="filteredContacts" class="hidden">篩選結果: 0</span>
+            </div>
+        </div>
+    </section>
+    
+    <!-- Department Filter -->
+    <section class="bg-gray-100 border-b">
+        <div class="container mx-auto px-4 py-3">
+            <div class="flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-hide" id="deptFilter">
+                <button class="dept-badge px-4 py-2 bg-primary text-white rounded-full text-sm font-medium whitespace-nowrap" data-dept="all">
+                    全部
+                </button>
+                <!-- Department buttons will be inserted here -->
+            </div>
+        </div>
+    </section>
+    
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6 pb-24">
+        <!-- Loading State -->
+        <div id="loadingState" class="flex flex-col items-center justify-center py-20">
+            <div class="spinner mb-4"></div>
+            <p class="text-gray-500">正在加載聯繫人數據...</p>
+        </div>
+        
+        <!-- Empty State -->
+        <div id="emptyState" class="hidden flex flex-col items-center justify-center py-20">
+            <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+                <i class="fas fa-search text-gray-400 text-3xl"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">未找到聯繫人</h3>
+            <p class="text-gray-500 text-center">請嘗試其他搜索關鍵詞</p>
+        </div>
+        
+        <!-- Contacts Grid -->
+        <div id="contactsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Contact cards will be inserted here -->
+        </div>
+    </main>
+    
+    <!-- Floating Action Button -->
+    <button id="fabBtn" class="fixed bottom-6 right-6 w-14 h-14 bg-accent text-white rounded-full shadow-lg hover:shadow-xl transition flex items-center justify-center z-50">
+        <i class="fas fa-plus text-xl"></i>
+    </button>
+    
+    <!-- Contact Detail Modal -->
+    <div id="contactModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-6">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-16 h-16 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold" id="modalAvatar">
+                            <!-- Initials -->
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800" id="modalName"></h2>
+                            <p class="text-secondary font-medium" id="modalPosition"></p>
+                        </div>
+                    </div>
+                    <button id="closeModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-building text-primary"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">部門</p>
+                            <p class="font-medium" id="modalDept"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-phone text-green-600"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs text-gray-500">電話</p>
+                            <p class="font-medium" id="modalPhone"></p>
+                        </div>
+                        <a href="#" id="callPhone" class="text-primary hover:text-secondary">
+                            <i class="fas fa-phone-alt text-xl"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-mobile-alt text-purple-600"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs text-gray-500">手機</p>
+                            <p class="font-medium" id="modalMobile"></p>
+                        </div>
+                        <a href="#" id="callMobile" class="text-primary hover:text-secondary">
+                            <i class="fas fa-phone-alt text-xl"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                            <i class="fas fa-envelope text-orange-600"></i>
+                        </div>
+                        <div class="flex-1">
+                            <p class="text-xs text-gray-500">電郵</p>
+                            <p class="font-medium text-sm" id="modalEmail"></p>
+                        </div>
+                        <a href="#" id="sendEmail" class="text-primary hover:text-secondary">
+                            <i class="fas fa-paper-plane text-xl"></i>
+                        </a>
+                    </div>
+                    
+                    <div class="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                        <div class="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i class="fas fa-sticky-note text-gray-600"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-500">備註</p>
+                            <p class="font-medium text-sm" id="modalNotes"></p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex space-x-3">
+                    <button id="editContact" class="flex-1 bg-primary text-white py-3 rounded-xl font-medium hover:bg-blue-800 transition">
+                        <i class="fas fa-edit mr-2"></i>編輯
+                    </button>
+                    <button id="deleteContact" class="flex-1 bg-red-500 text-white py-3 rounded-xl font-medium hover:bg-red-600 transition">
+                        <i class="fas fa-trash mr-2"></i>刪除
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Contact Modal -->
+    <div id="editModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-bold" id="editModalTitle">新增聯繫人</h2>
+                    <button id="closeEditModal" class="text-gray-400 hover:text-gray-600">
+                        <i class="fas fa-times text-2xl"></i>
+                    </button>
+                </div>
+                
+                <form id="contactForm" class="space-y-4">
+                    <input type="hidden" id="contactId">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">姓名 *</label>
+                        <input type="text" id="formName" required class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">部門 *</label>
+                        <select id="formDept" required class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                            <option value="">選擇部門</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">職位 *</label>
+                        <input type="text" id="formPosition" required class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">電話</label>
+                        <input type="tel" id="formPhone" class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">手機</label>
+                        <input type="tel" id="formMobile" class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">電郵</label>
+                        <input type="email" id="formEmail" class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                        <textarea id="formNotes" rows="3" class="w-full px-4 py-2 border rounded-lg focus:border-secondary focus:outline-none"></textarea>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-primary text-white py-3 rounded-xl font-medium hover:bg-blue-800 transition">
+                        <i class="fas fa-save mr-2"></i>保存
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-24 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full shadow-lg z-50 hidden">
+        <span id="toastMessage"></span>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="contacts-data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
