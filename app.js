@@ -209,39 +209,52 @@ class ContactManager {
         }
     }
     
-    // Render department filter buttons
+    // Render department filter dropdown
     renderDepartmentFilter() {
-        const container = document.getElementById('deptFilter');
-        const allButton = container.querySelector('[data-dept="all"]');
+        const select = document.getElementById('deptFilter');
+        const clearBtn = document.getElementById('clearDeptFilter');
         
-        // Clear existing except "All"
-        container.innerHTML = '';
-        container.appendChild(allButton);
-        
-        departments.forEach(dept => {
-            const btn = document.createElement('button');
-            btn.className = 'dept-badge px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-full text-sm font-medium whitespace-nowrap hover:bg-gray-50';
-            btn.textContent = dept;
-            btn.dataset.dept = dept;
-            btn.addEventListener('click', () => this.selectDepartment(dept));
-            container.appendChild(btn);
+        // Count contacts per department
+        const deptCounts = {};
+        this.contacts.forEach(c => {
+            deptCounts[c.department] = (deptCounts[c.department] || 0) + 1;
         });
         
-        allButton.addEventListener('click', () => this.selectDepartment('all'));
+        // Clear existing options except "all"
+        select.innerHTML = '<option value="all">📋 全部部門 (' + this.contacts.length + '人)</option>';
+        
+        // Sort departments by contact count (descending)
+        const sortedDepts = Object.entries(deptCounts)
+            .sort((a, b) => b[1] - a[1])
+            .map(([dept, count]) => ({ name: dept, count }));
+        
+        // Add department options
+        sortedDepts.forEach(({ name, count }) => {
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = `${name} (${count}人)`;
+            select.appendChild(option);
+        });
+        
+        // Event listener for dropdown change
+        select.addEventListener('change', (e) => {
+            this.selectDepartment(e.target.value);
+        });
+        
+        // Clear filter button
+        clearBtn.addEventListener('click', () => {
+            select.value = 'all';
+            this.selectDepartment('all');
+        });
     }
     
     // Select department filter
     selectDepartment(dept) {
         this.currentDept = dept;
         
-        // Update UI
-        document.querySelectorAll('.dept-badge').forEach(btn => {
-            if (btn.dataset.dept === dept) {
-                btn.className = 'dept-badge px-4 py-2 bg-primary text-white rounded-full text-sm font-medium whitespace-nowrap';
-            } else {
-                btn.className = 'dept-badge px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-full text-sm font-medium whitespace-nowrap hover:bg-gray-50';
-            }
-        });
+        // Update clear button visibility
+        const clearBtn = document.getElementById('clearDeptFilter');
+        clearBtn.classList.toggle('hidden', dept === 'all');
         
         this.filterContacts();
     }
@@ -297,23 +310,28 @@ class ContactManager {
         const initials = contact.name.charAt(0);
         const deptColor = this.getDeptColor(contact.department);
         
+        // Truncate department name if too long
+        const deptDisplay = contact.department.length > 12 
+            ? contact.department.substring(0, 12) + '...' 
+            : contact.department;
+        
         return `
-            <div class="contact-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer" data-id="${contact.id}">
+            <div class="contact-card bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-all" data-id="${contact.id}">
                 <div class="flex items-start space-x-3">
-                    <div class="w-12 h-12 ${deptColor} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                    <div class="w-12 h-12 ${deptColor} rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm">
                         ${initials}
                     </div>
                     <div class="flex-1 min-w-0">
-                        <h3 class="font-bold text-gray-800 truncate">${contact.name}</h3>
-                        <p class="text-sm text-secondary font-medium">${contact.position}</p>
-                        <span class="inline-block mt-1 px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
-                            ${contact.department}
+                        <h3 class="font-bold text-gray-800 truncate text-base">${contact.name}</h3>
+                        <p class="text-sm text-gray-500 truncate">${contact.position || '未提供職位'}</p>
+                        <span class="inline-block mt-2 px-2.5 py-1 bg-gray-100 text-gray-600 text-xs rounded-lg font-medium border border-gray-200">
+                            ${deptDisplay}
                         </span>
                     </div>
                 </div>
-                <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-                    ${contact.phone ? `<span><i class="fas fa-phone mr-1"></i>${contact.phone}</span>` : '<span></span>'}
-                    ${contact.mobile ? `<span><i class="fas fa-mobile-alt mr-1"></i>${contact.mobile}</span>` : ''}
+                <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
+                    ${contact.phone ? `<span class="text-green-600 font-medium"><i class="fas fa-phone mr-1.5"></i>${contact.phone}</span>` : '<span class="text-gray-400">無電話</span>'}
+                    ${contact.mobile ? `<span class="text-blue-600 font-medium"><i class="fas fa-mobile-alt mr-1.5"></i>${contact.mobile}</span>` : ''}
                 </div>
             </div>
         `;
@@ -321,19 +339,66 @@ class ContactManager {
     
     // Get department color
     getDeptColor(dept) {
-        const colors = {
+        const colorMap = {
+            // 核心技術部門 - 藍色系
             '資訊科技部': 'bg-blue-600',
+            'RPA-OA及IT内部应用及基建系统': 'bg-blue-500',
+            '主机及Jobflow变更管理': 'bg-blue-500',
+            '技术规划与管理': 'bg-blue-500',
+            'UAT Operation': 'bg-blue-500',
+            
+            // 安全相關 - 紅色系
             '網絡安全部': 'bg-red-600',
+            '网络攻击防御': 'bg-red-500',
+            '资讯安全控制': 'bg-red-500',
+            '資訊安全部': 'bg-red-600',
+            
+            // 基礎設施 - 綠色系
             '基礎設施部': 'bg-green-600',
+            '基礎架構': 'bg-green-500',
+            '基建系統': 'bg-green-500',
+            
+            // 開發相關 - 紫色系
             '應用開發部': 'bg-purple-600',
-            '數據分析部': 'bg-yellow-600',
+            '借記卡及收单技术方案组': 'bg-purple-500',
+            '新卡系统': 'bg-purple-500',
+            '卡系统支援': 'bg-purple-500',
+            
+            // 渠道相關 - 黃/橙色系
+            '個人電子渠道組': 'bg-yellow-600',
+            '企业电子渠道组': 'bg-amber-500',
+            '移動科技組': 'bg-orange-500',
+            '自助服务': 'bg-orange-500',
+            
+            // 數據/分析 - 青色系
+            '數據分析部': 'bg-cyan-600',
+            '智能数据分析': 'bg-cyan-500',
+            '企業金融及管理': 'bg-teal-500',
+            
+            // 項目/管理 - 粉色系
             '項目管理部': 'bg-pink-600',
+            '授信审批': 'bg-pink-500',
+            
+            // 支援/其他 - 灰色系
             '技術支援部': 'bg-indigo-600',
             '質量保證部': 'bg-teal-600',
-            '雲計算部': 'bg-cyan-600',
-            '人工智能部': 'bg-orange-600'
+            '雲計算部': 'bg-sky-500',
+            '人工智能部': 'bg-violet-500',
         };
-        return colors[dept] || 'bg-gray-600';
+        
+        // 如果沒有精確匹配，根據關鍵詞匹配
+        if (colorMap[dept]) return colorMap[dept];
+        
+        if (dept.includes('安全') || dept.includes('防禦') || dept.includes('控制')) return 'bg-red-500';
+        if (dept.includes('卡') || dept.includes('支付') || dept.includes('收單')) return 'bg-purple-500';
+        if (dept.includes('渠道') || dept.includes('電子') || dept.includes('移動') || dept.includes('自助')) return 'bg-orange-500';
+        if (dept.includes('數據') || dept.includes('分析') || dept.includes('智能')) return 'bg-cyan-500';
+        if (dept.includes('基礎') || dept.includes('基建') || dept.includes('架構')) return 'bg-green-500';
+        if (dept.includes('開發') || dept.includes('系統') || dept.includes('技術')) return 'bg-blue-500';
+        if (dept.includes('管理') || dept.includes('規劃') || dept.includes('項目')) return 'bg-pink-500';
+        if (dept.includes('支援') || dept.includes('服務') || dept.includes('運營')) return 'bg-indigo-500';
+        
+        return 'bg-gray-500';
     }
     
     // Update statistics
